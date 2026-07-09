@@ -13,7 +13,11 @@ abstract class AppAnalytics {
     Map<String, Object?> parameters = const <String, Object?>{},
   });
 
-  Future<void> logScreenView({required String screenName});
+  Future<void> logScreenView({
+    required String screenName,
+    String? screenClass,
+    Map<String, Object?> parameters = const <String, Object?>{},
+  });
 
   Future<void> setUserProperty({required String name, required String? value});
 
@@ -72,10 +76,20 @@ class FirebaseAppAnalytics implements AppAnalytics {
   }
 
   @override
-  Future<void> logScreenView({required String screenName}) {
+  Future<void> logScreenView({
+    required String screenName,
+    String? screenClass,
+    Map<String, Object?> parameters = const <String, Object?>{},
+  }) {
+    final Map<String, Object?> mergedParameters = <String, Object?>{
+      ..._contextProperties,
+      ...parameters,
+    };
+
     return _analytics.logScreenView(
       screenName: screenName,
-      parameters: sanitizeFirebaseParameters(_contextProperties),
+      screenClass: screenClass,
+      parameters: sanitizeFirebaseParameters(mergedParameters),
     );
   }
 

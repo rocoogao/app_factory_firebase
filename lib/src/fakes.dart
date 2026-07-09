@@ -10,9 +10,15 @@ class FakeAnalyticsEvent {
 }
 
 class FakeScreenView {
-  const FakeScreenView({required this.screenName});
+  const FakeScreenView({
+    required this.screenName,
+    required this.parameters,
+    this.screenClass,
+  });
 
   final String screenName;
+  final String? screenClass;
+  final Map<String, Object?> parameters;
 }
 
 class FakeUserProperty {
@@ -67,8 +73,18 @@ class FakeAppAnalytics implements AppAnalytics {
   }
 
   @override
-  Future<void> logScreenView({required String screenName}) async {
-    screenViews.add(FakeScreenView(screenName: screenName));
+  Future<void> logScreenView({
+    required String screenName,
+    String? screenClass,
+    Map<String, Object?> parameters = const <String, Object?>{},
+  }) async {
+    screenViews.add(
+      FakeScreenView(
+        screenName: screenName,
+        screenClass: screenClass,
+        parameters: <String, Object?>{...contextProperties, ...parameters},
+      ),
+    );
   }
 
   @override

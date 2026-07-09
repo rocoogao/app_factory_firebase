@@ -1,3 +1,8 @@
+## 0.0.2
+
+- Added `screenClass` and custom `parameters` support to `AppAnalytics.logScreenView`.
+- Updated `FakeAppAnalytics` screen view records to include screen class and parameters.
+
 ## 0.0.1
 
 Initial release.

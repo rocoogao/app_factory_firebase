@@ -142,6 +142,26 @@ void main() {
     });
   });
 
+  test('FakeAppAnalytics records screen views for assertions', () async {
+    final FakeAppAnalytics analytics = FakeAppAnalytics();
+    analytics.setContextProperty('app_id', 'mx_expense');
+
+    await analytics.logScreenView(
+      screenName: 'Home',
+      screenClass: 'BottomTab',
+      parameters: <String, Object?>{'language': 'es-MX', 'currency': 'MXN'},
+    );
+
+    expect(analytics.screenViews, hasLength(1));
+    expect(analytics.screenViews.single.screenName, 'Home');
+    expect(analytics.screenViews.single.screenClass, 'BottomTab');
+    expect(analytics.screenViews.single.parameters, <String, Object?>{
+      'app_id': 'mx_expense',
+      'language': 'es-MX',
+      'currency': 'MXN',
+    });
+  });
+
   test('FakeAppPerformanceTracer records traces and stops them', () async {
     final FakeAppPerformanceTracer tracer = FakeAppPerformanceTracer();
 

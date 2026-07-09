@@ -193,6 +193,20 @@ class App extends ConsumerWidget {
 Firebase screen tracking works best when your routes have meaningful names.
 Keep app-specific route and screen naming rules in your app.
 
+For app-specific screen schemas, log screen views through `appAnalyticsProvider`
+so you can pass screen classes and Firebase-safe parameters:
+
+```dart
+await ref.read(appAnalyticsProvider).logScreenView(
+  screenName: 'Home',
+  screenClass: 'BottomTab',
+  parameters: {
+    'language': 'es-MX',
+    'currency': 'MXN',
+  },
+);
+```
+
 ## Analytics Events
 
 Keep event names in your app, not in this package:
