@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'analytics.dart';
 import 'crashlytics.dart';
 
@@ -33,10 +35,16 @@ class DefaultAppTelemetryIdentity implements AppTelemetryIdentity {
     }
 
     await Future.wait(<Future<void>>[
-      _analytics.setUserId(userId),
-      _crashReporter.setUserIdentifier(userId),
+      _runSafely('set Analytics user ID', () => _analytics.setUserId(userId)),
+      _runSafely(
+        'set Crashlytics user identifier',
+        () => _crashReporter.setUserIdentifier(userId),
+      ),
       for (final MapEntry<String, String> entry in properties.entries)
-        _analytics.setUserProperty(name: entry.key, value: entry.value),
+        _runSafely(
+          'set Analytics user property "${entry.key}"',
+          () => _analytics.setUserProperty(name: entry.key, value: entry.value),
+        ),
     ]);
   }
 
@@ -45,10 +53,29 @@ class DefaultAppTelemetryIdentity implements AppTelemetryIdentity {
     Iterable<String> propertyNames = const <String>[],
   }) async {
     await Future.wait(<Future<void>>[
-      _analytics.setUserId(null),
-      _crashReporter.setUserIdentifier(null),
+      _runSafely('clear Analytics user ID', () => _analytics.setUserId(null)),
+      _runSafely(
+        'clear Crashlytics user identifier',
+        () => _crashReporter.setUserIdentifier(null),
+      ),
       for (final String propertyName in propertyNames)
-        _analytics.setUserProperty(name: propertyName, value: null),
+        _runSafely(
+          'clear Analytics user property "$propertyName"',
+          () => _analytics.setUserProperty(name: propertyName, value: null),
+        ),
     ]);
+  }
+
+  Future<void> _runSafely(
+    String operation,
+    Future<void> Function() action,
+  ) async {
+    try {
+      await action();
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[AppFactoryFirebase] Failed to $operation: $error\n$stackTrace',
+      );
+    }
   }
 }

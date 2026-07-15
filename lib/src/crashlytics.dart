@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 
@@ -44,21 +46,47 @@ class FirebaseCrashlyticsFlutterErrorInitializer {
 
   static void setup(AppCrashReporter crashReporter) {
     FlutterError.onError = (FlutterErrorDetails details) {
-      crashReporter.recordError(
+      _recordErrorSafely(
+        crashReporter,
         details.exception,
         details.stack ?? StackTrace.empty,
-        fatal: true,
       );
 
-      if (kDebugMode) {
+      if (!kReleaseMode) {
         FlutterError.presentError(details);
       }
     };
 
     PlatformDispatcher.instance.onError =
         (Object error, StackTrace stackTrace) {
-          crashReporter.recordError(error, stackTrace, fatal: true);
+          _recordErrorSafely(crashReporter, error, stackTrace);
           return kReleaseMode;
         };
+  }
+
+  static void _recordErrorSafely(
+    AppCrashReporter crashReporter,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    try {
+      unawaited(
+        crashReporter.recordError(error, stackTrace, fatal: true).catchError((
+          Object uploadError,
+          StackTrace uploadStackTrace,
+        ) {
+          _debugRecordFailure(uploadError, uploadStackTrace);
+        }),
+      );
+    } catch (uploadError, uploadStackTrace) {
+      _debugRecordFailure(uploadError, uploadStackTrace);
+    }
+  }
+
+  static void _debugRecordFailure(Object error, StackTrace stackTrace) {
+    debugPrint(
+      '[AppFactoryFirebase] Crashlytics global error upload failed: '
+      '$error\n$stackTrace',
+    );
   }
 }

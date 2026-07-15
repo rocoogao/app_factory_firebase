@@ -42,7 +42,7 @@ Add the dependency:
 
 ```yaml
 dependencies:
-  app_factory_firebase: ^0.0.1
+  app_factory_firebase: ^0.0.3
 ```
 
 Then run:
@@ -171,41 +171,103 @@ continue to run.
 
 ## Screen Tracking
 
-Add `firebaseAnalyticsObserverProvider` to your `MaterialApp` or `CupertinoApp`.
+The package tracks `GoRouterState`, sends screen views through
+`AppScreenTracker`, and stores the current screen for interaction events.
+
+```text
+GoRouterState -> Resolver -> AppScreenTracker -> Firebase Analytics
+                                  |
+                                  v
+                       click_element / view_pop
+```
 
 ```dart
+final appRouterProvider = Provider<GoRouter>((ref) {
+  return GoRouter(
+    initialLocation: '/home',
+    routes: [
+      GoRoute(
+        name: 'home',
+        path: '/home',
+        builder: (context, state) => const HomePage(),
+      ),
+    ],
+  );
+});
+
 class App extends ConsumerWidget {
   const App({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return MaterialApp(
-      title: 'Example App',
-      navigatorObservers: [
-        ref.watch(firebaseAnalyticsObserverProvider),
-      ],
-      home: const HomePage(),
-    );
+    final GoRouter router = ref.watch(appRouterProvider);
+    ref.watch(goRouterScreenTrackingProvider(router));
+
+    return MaterialApp.router(routerConfig: router);
   }
 }
 ```
 
-Firebase screen tracking works best when your routes have meaningful names.
-Keep app-specific route and screen naming rules in your app.
+This package sends screen views manually. Disable Firebase automatic screen
+reporting to avoid duplicate `screen_view` events:
 
-For app-specific screen schemas, log screen views through `appAnalyticsProvider`
-so you can pass screen classes and Firebase-safe parameters:
+```xml
+<!-- android/app/src/main/AndroidManifest.xml, inside <application> -->
+<meta-data
+    android:name="google_analytics_automatic_screen_reporting_enabled"
+    android:value="false" />
+```
+
+```xml
+<!-- ios/Runner/Info.plist -->
+<key>FirebaseAutomaticScreenReportingEnabled</key>
+<false/>
+```
+
+Do not also register `FirebaseAnalyticsObserver` on navigators managed by the
+same `GoRouter`.
+
+Production apps should override the resolver with stable Analytics screen
+names.
 
 ```dart
-await ref.read(appAnalyticsProvider).logScreenView(
-  screenName: 'Home',
-  screenClass: 'BottomTab',
-  parameters: {
-    'language': 'es-MX',
-    'currency': 'MXN',
-  },
-);
+AppScreenResolution resolveAppScreen(GoRouterState state) {
+  return switch (state.name) {
+    'home' => const AppTrackedScreen(
+        AppResolvedScreen(screenName: 'Home'),
+      ),
+    'historyDetail' => const AppTrackedScreen(
+        AppResolvedScreen(screenName: 'HistoryDetail'),
+      ),
+    'deleteConfirmDialog' => const AppIgnoredScreen(),
+    _ => AppTrackedScreen(
+        AppResolvedScreen(
+          screenName: 'UnmappedRoute',
+          parameters: {'route_name': state.name ?? 'unnamed'},
+        ),
+      ),
+  };
+}
+
+final screenResolverOverride =
+    goRouterScreenResolverProvider.overrideWithValue(resolveAppScreen);
 ```
+
+- Initial routes, nested routes, back navigation, and `StatefulShellRoute`
+  branches are tracked automatically.
+- Query-only changes are deduplicated unless the resolver supplies a
+  `trackingKey`.
+- `showDialog` keeps the underlying screen; router-backed dialogs should resolve
+  to `AppIgnoredScreen`.
+- `AppUnmappedScreen` is diagnostic-only and preserves the previous screen
+  context. Real page routes should use a tracked `UnmappedRoute` fallback to
+  avoid attributing interactions to the previous page.
+- Screens outside `go_router` can call `appScreenTrackerProvider` directly.
+- Tracking failures are fail-open and available through
+  `appScreenTrackingIssueSinkProvider`.
+
+See [GoRouter Screen Tracking](doc/go_router_screen_tracking.md) for resolver
+metadata, popup rules, deduplication, issue reporting, and edge cases.
 
 ## Analytics Events
 
@@ -243,10 +305,41 @@ Analytics parameters are sanitized before reaching Firebase:
 
 Convert lists, maps, and custom objects into simple fields before logging.
 
+### Interaction Events
+
+`appInteractionEventsProvider` records the `click_element` and `view_pop`
+event schemas. It automatically includes `screen_name` from the latest tracked
+screen. Route and tab names should therefore be stable, app-specific identifiers.
+If an interaction occurs before any screen is tracked, `screen_name` is set to
+`unknown` and a debug warning is printed.
+
+```dart
+await ref.read(appInteractionEventsProvider).clickElement(
+  elementId: 'add_expense_button',
+  elementName: 'add_expense',
+);
+
+await ref.read(appInteractionEventsProvider).viewPop(
+  popId: 'delete_expense_confirm',
+  popName: 'delete_expense_confirm',
+);
+```
+
+For a nested flow that does not match the active route, pass `screenName` to
+either method to override the current page for that event.
+
 ## Crash Reporting
 
 Global Flutter and Dart fatal errors can be connected during initialization with
 `captureFlutterErrors: true`.
+
+When enabled, this package is the sole owner of `FlutterError.onError` and
+`PlatformDispatcher.instance.onError` and replaces any previously installed
+handlers. Do not install another global error handler alongside it. Apps that
+need another monitoring SDK or custom global error handling must set
+`captureFlutterErrors: false` and own the forwarding to Crashlytics explicitly.
+Flutter framework errors are still presented locally in debug and profile
+builds, while Crashlytics upload failures remain fail-open.
 
 For errors you catch manually:
 
@@ -331,6 +424,9 @@ This updates:
 - Analytics user id
 - Analytics user properties
 - Crashlytics user identifier
+
+Identity synchronization is best-effort. Analytics or Crashlytics failures are
+logged for diagnostics and are not propagated back into login or logout flows.
 
 On logout, clear the identity:
 

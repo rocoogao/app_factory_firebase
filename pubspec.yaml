@@ -1,6 +1,6 @@
 name: app_factory_firebase
 description: Riverpod-native Firebase bootstrap, telemetry, Crashlytics, Performance, Dio, and test fake helpers for Flutter apps.
-version: 0.0.2
+version: 0.0.3
 repository: https://github.com/rocoogao/app_factory_firebase
 issue_tracker: https://github.com/rocoogao/app_factory_firebase/issues
 topics:
@@ -12,7 +12,7 @@ topics:
 
 environment:
   sdk: ^3.11.5
-  flutter: ">=1.17.0"
+  flutter: ">=3.38.0"
 
 dependencies:
   dio: ^5.9.0
@@ -24,6 +24,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_riverpod: ^3.3.1
+  go_router: ^17.3.0
 
 dev_dependencies:
   flutter_test:

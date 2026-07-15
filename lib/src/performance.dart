@@ -19,7 +19,64 @@ abstract class AppPerformanceTracer {
   Future<T> traceAsync<T>(
     String name,
     Future<T> Function(AppTraceHandle trace) action,
-  );
+  ) async {
+    AppTraceHandle handle;
+    try {
+      handle = await startTrace(name);
+    } catch (error, stackTrace) {
+      _debugTraceFailure('start', name, error, stackTrace);
+      handle = const _NoopAppTraceHandle();
+    }
+
+    try {
+      return await action(handle);
+    } catch (error) {
+      try {
+        handle.putAttribute('error', 'true');
+        handle.putAttribute('error_message', error.toString());
+      } catch (traceError, stackTrace) {
+        _debugTraceFailure('annotate', name, traceError, stackTrace);
+      }
+      rethrow;
+    } finally {
+      try {
+        await handle.stop();
+      } catch (error, stackTrace) {
+        _debugTraceFailure('stop', name, error, stackTrace);
+      }
+    }
+  }
+}
+
+class _NoopAppTraceHandle implements AppTraceHandle {
+  const _NoopAppTraceHandle();
+
+  @override
+  void incrementMetric(String name, int incrementBy) {}
+
+  @override
+  void putAttribute(String name, String value) {}
+
+  @override
+  void setMetric(String name, int value) {}
+
+  @override
+  Future<void> stop() async {}
+}
+
+void _debugTraceFailure(
+  String operation,
+  String traceName,
+  Object error,
+  StackTrace stackTrace,
+) {
+  assert(() {
+    debugPrint(
+      'Firebase trace "$traceName" failed to $operation: '
+      '$error\n$stackTrace',
+    );
+    return true;
+  }());
 }
 
 class FirebaseAppTraceHandle implements AppTraceHandle {
@@ -48,7 +105,7 @@ class FirebaseAppTraceHandle implements AppTraceHandle {
   }
 }
 
-class FirebaseAppPerformanceTracer implements AppPerformanceTracer {
+class FirebaseAppPerformanceTracer extends AppPerformanceTracer {
   FirebaseAppPerformanceTracer({FirebasePerformance? performance})
     : _performance = performance ?? FirebasePerformance.instance;
 
@@ -64,32 +121,5 @@ class FirebaseAppPerformanceTracer implements AppPerformanceTracer {
     final Trace trace = _performance.newTrace(name);
     await trace.start();
     return FirebaseAppTraceHandle(trace);
-  }
-
-  @override
-  Future<T> traceAsync<T>(
-    String name,
-    Future<T> Function(AppTraceHandle trace) action,
-  ) async {
-    final AppTraceHandle handle = await startTrace(name);
-    try {
-      return await action(handle);
-    } catch (error) {
-      handle.putAttribute('error', 'true');
-      handle.putAttribute('error_message', error.toString());
-      rethrow;
-    } finally {
-      try {
-        await handle.stop();
-      } catch (error, stackTrace) {
-        assert(() {
-          debugPrint(
-            'Failed to stop Firebase trace "$name": '
-            '$error\n$stackTrace',
-          );
-          return true;
-        }());
-      }
-    }
   }
 }

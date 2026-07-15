@@ -175,7 +175,7 @@ class FakeAppTraceHandle implements AppTraceHandle {
   }
 }
 
-class FakeAppPerformanceTracer implements AppPerformanceTracer {
+class FakeAppPerformanceTracer extends AppPerformanceTracer {
   final List<bool> collectionEnabledValues = <bool>[];
   final List<FakeTraceRecord> traces = <FakeTraceRecord>[];
 
@@ -189,22 +189,5 @@ class FakeAppPerformanceTracer implements AppPerformanceTracer {
     final FakeTraceRecord record = FakeTraceRecord(name: name);
     traces.add(record);
     return FakeAppTraceHandle(record);
-  }
-
-  @override
-  Future<T> traceAsync<T>(
-    String name,
-    Future<T> Function(AppTraceHandle trace) action,
-  ) async {
-    final AppTraceHandle handle = await startTrace(name);
-    try {
-      return await action(handle);
-    } catch (error) {
-      handle.putAttribute('error', 'true');
-      handle.putAttribute('error_message', error.toString());
-      rethrow;
-    } finally {
-      await handle.stop();
-    }
   }
 }
