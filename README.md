@@ -19,7 +19,7 @@ Firebase Analytics, Crashlytics, and Performance Monitoring.
 - Firebase Performance helper for Dio
 - Identity synchronization across Analytics and Crashlytics
 - Fake implementations for tests
-- Riverpod providers as the single source of truth
+- Generated Riverpod providers as the single source of truth
 
 ## What This Package Does Not Own
 
@@ -533,6 +533,15 @@ Available fakes:
 - `FakeAppAnalytics`
 - `FakeAppCrashReporter`
 - `FakeAppPerformanceTracer`
+
+## Development
+
+Provider declarations use `riverpod_generator`. After changing
+`lib/src/providers.dart`, regenerate and commit `lib/src/providers.g.dart`:
+
+```bash
+dart run build_runner build
+```
 
 ## FAQ
 

@@ -1,3 +1,8 @@
+## 0.0.4
+
+- Migrated all package Provider declarations to `riverpod_generator` while
+  preserving the existing provider names, lifecycles, and override API.
+
 ## 0.0.3
 
 - Added `go_router` screen tracking with named-route and `StatefulShellRoute` support.
